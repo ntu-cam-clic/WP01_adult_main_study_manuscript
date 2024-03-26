@@ -1,0 +1,69 @@
+## model code adapted from Gläscher, Adolphs, & Tranel (2019), Nature Communications. Please cite this paper if you are using this code ## 
+
+model
+    {
+# mu
+  r_a ~ dunif(0.001,0.999)
+  p_a ~ dunif(0.001,0.999)
+  d_a ~ dunif(0.001,4.999)
+  
+# intersubject variability
+  r_sd ~ dnorm(0,0.05)T(0.001,)
+  p_sd ~ dnorm(0,0.05)T(0.001,)
+  d_sd ~ dnorm(0,1)T(0.001,)
+
+# precision
+  r_b <- 1/(r_sd^2)
+  p_b <- 1/(p_sd^2)
+  d_b <- 1/(d_sd^2)
+  
+    f = 0
+    
+    for (j in 1:N_SUBJECTS) {
+    
+    ### DEFINE PRIORS
+           #T (x,y) is used to set limits on parameter values
+           
+    r[j] ~ dnorm(r_a,r_b) T(0.001,0.999)
+    p[j] ~ dnorm(p_a,p_b) T(0.001,0.999)
+    d[j] ~ dnorm(d_a,d_b) T(0.001,4.999)
+
+    ##### INITIALISE VARIABLES ######
+
+    att_signal[j,1,1] <- 1/3    
+    att_signal[j,1,2] <- 1/3 
+    att_signal[j,1,3] <- 1/3 
+    
+  ## LOOP THROUGH TRIALS ##  
+    for (t in 1:N_TRIALS[j]) {
+    
+    # compute action probability from a
+    prob[j,t] <- (deck_match_rule[j,t,] %*% att_signal[j,t,]^d[j]) / (sum(att_signal[j,t,]^d[j])+1.0E-10) 
+      
+    # constrain probability between (and excluding) 0 and 1
+    tmp[j,t] <- (prob[j,t]<=0) * 1.0E-10 + (prob[j,t]>=1) * (1 - 1.0E-10) + (prob[j,t]>0 && prob[j,t]<1) * prob[j,t]
+      
+    # relate data to model
+    one[j,t] ~ dbern(tmp[j,t])
+    
+    #### FOR FEEDBACK SIGNAL ####
+    
+    # feedback signal depending on outcome (reward/punishment)
+    denomw[j,t] <- sum(deck_match_rule[j,t,]* att_signal[j,t,]^f) + 1.0E-10
+    denoml[j,t] <- sum((1-deck_match_rule[j,t,]) * att_signal[j,t,]^f) + 1.0E-10
+    fdbk_signal[j,t,1] <- ((outcome[j,t]==1) * (deck_match_rule[j,t,1] * att_signal[j,t,1]^f) / denomw[j,t]) + ((outcome[j,t]==0) * ((1-deck_match_rule[j,t,1]) * att_signal[j,t,1]^f) / denoml[j,t])
+    fdbk_signal[j,t,2] <- ((outcome[j,t]==1) * (deck_match_rule[j,t,2] * att_signal[j,t,2]^f) / denomw[j,t]) + ((outcome[j,t]==0) * ((1-deck_match_rule[j,t,2]) * att_signal[j,t,2]^f) / denoml[j,t])
+    fdbk_signal[j,t,3] <- ((outcome[j,t]==1) * (deck_match_rule[j,t,3] * att_signal[j,t,3]^f) / denomw[j,t]) + ((outcome[j,t]==0) * ((1-deck_match_rule[j,t,3]) * att_signal[j,t,3]^f) / denoml[j,t])
+     
+    #### FOR ATTENTION SIGNAL ####
+    
+        # update attention weights
+    att_signal[j,t+1,1] <- (outcome[j,t]==1) * ((1-r[j]) * att_signal[j,t,1] + r[j] * fdbk_signal[j,t,1]) + (outcome[j,t]==0) * ((1-p[j]) * att_signal[j,t,1] + p[j] * fdbk_signal[j,t,1])
+    att_signal[j,t+1,2] <- (outcome[j,t]==1) * ((1-r[j]) * att_signal[j,t,2] + r[j] * fdbk_signal[j,t,2]) + (outcome[j,t]==0) * ((1-p[j]) * att_signal[j,t,2] + p[j] * fdbk_signal[j,t,2])
+    att_signal[j,t+1,3] <- (outcome[j,t]==1) * ((1-r[j]) * att_signal[j,t,3] + r[j] * fdbk_signal[j,t,3]) + (outcome[j,t]==0) * ((1-p[j]) * att_signal[j,t,3] + p[j] * fdbk_signal[j,t,3])
+     
+    } #end of trial loop
+    
+    } # end of subject loop
+    
+    }
