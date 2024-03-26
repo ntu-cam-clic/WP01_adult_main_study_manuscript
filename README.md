@@ -1,2 +1,2 @@
-# WP01_adult_main_study
+# CLIC WP01 adult main study manuscript
 Scripts used in the CLIC WP01 adult main study manuscript
